@@ -1,0 +1,122 @@
+name: Build OpenSSL
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+env:
+  OPENSSL_VERSION: 3.5.6
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Remove system OpenSSL
+        run: sudo apt-get remove -y libssl-dev
+
+      - name: Download OpenSSL source
+        run: |
+          curl -L -o openssl-${{ env.OPENSSL_VERSION }}.tar.gz https://www.openssl.org/source/openssl-${{ env.OPENSSL_VERSION }}.tar.gz
+          tar -xzf openssl-${{ env.OPENSSL_VERSION }}.tar.gz
+
+      - name: Configure OpenSSL
+        run: |
+          cd openssl-${{ env.OPENSSL_VERSION }}
+          ./Configure --prefix=${{ runner.temp }}/openssl-install
+
+      - name: Build OpenSSL
+        run: |
+          cd openssl-${{ env.OPENSSL_VERSION }}
+          make -j$(nproc)
+
+      - name: Test OpenSSL
+        run: |
+          cd openssl-${{ env.OPENSSL_VERSION }}
+          make test
+
+      - name: Install OpenSSL
+        run: |
+          cd openssl-${{ env.OPENSSL_VERSION }}
+          make install
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: openssl-linux-x64
+          path: ${{ runner.temp }}/openssl-install
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Strawberry Perl
+        run: choco install strawberryperl --no-progress
+
+      - name: Install NASM
+        run: choco install nasm --no-progress
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Download OpenSSL source
+        run: |
+          curl.exe -L -o openssl-${{ env.OPENSSL_VERSION }}.tar.gz https://www.openssl.org/source/openssl-${{ env.OPENSSL_VERSION }}.tar.gz
+          tar -xzf openssl-${{ env.OPENSSL_VERSION }}.tar.gz
+
+      - name: Configure OpenSSL
+        run: |
+          cd openssl-${{ env.OPENSSL_VERSION }}
+          perl Configure VC-WIN64A-HYBRIDCRT --prefix=${{ runner.temp }}\openssl-install
+
+      - name: Build OpenSSL
+        run: |
+          cd openssl-${{ env.OPENSSL_VERSION }}
+          nmake
+
+      - name: Test OpenSSL
+        run: |
+          cd openssl-${{ env.OPENSSL_VERSION }}
+          nmake test
+
+      - name: Install OpenSSL
+        run: |
+          cd openssl-${{ env.OPENSSL_VERSION }}
+          nmake install
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: openssl-windows-x64
+          path: ${{ runner.temp }}\openssl-install
+
+  release:
+    needs: [build-linux, build-windows]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: openssl-linux-x64
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: openssl-windows-x64
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            openssl-linux-x64/**/*
+            openssl-windows-x64/**/*
