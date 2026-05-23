@@ -49,7 +49,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: openssl-linux-x64
+          name: openssl-${{ env.OPENSSL_VERSION }}-linux-x64
           path: ${{ runner.temp }}/openssl-install
 
   build-windows:
@@ -94,7 +94,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: openssl-windows-x64
+          name: openssl-${{ env.OPENSSL_VERSION }}-windows-x64
           path: ${{ runner.temp }}\openssl-install
 
   release:
@@ -107,16 +107,19 @@ jobs:
       - name: Download Linux artifacts
         uses: actions/download-artifact@v5
         with:
-          name: openssl-linux-x64
+          name: openssl-${{ env.OPENSSL_VERSION }}-linux-x64
+          path: openssl-${{ env.OPENSSL_VERSION }}-linux-x64
 
       - name: Download Windows artifacts
         uses: actions/download-artifact@v5
         with:
-          name: openssl-windows-x64
+          name: openssl-${{ env.OPENSSL_VERSION }}-windows-x64
+          path: openssl-${{ env.OPENSSL_VERSION }}-windows-x64
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            openssl-linux-x64/**/*
-            openssl-windows-x64/**/*
+            openssl-${{ env.OPENSSL_VERSION }}-linux-x64/**/*
+            openssl-${{ env.OPENSSL_VERSION }}-windows-x64/**/*
+          generate_release_notes: true
